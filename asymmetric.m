@@ -1,52 +1,54 @@
+%% copy the symmetric case
+%% obtain all the components along and perpendicular to LOS
+%% hardcode the intial conditions
+%% setting initial condition as follows:
+%  target is on perpendicular bisector
+%  pursuers velocity rays intersecting somewhere in the region
+%  give initial horizontal velocity (LOS Frame) to target
+% for convenient initial coding, setting initial pursuer positions on the "east-axis"
 clear; close all
 % Pro-Nav gain, unitless (typically set between 3-5)
 N = 4;
 weight = 0.55;
-% Pursuer-1 init prams
-pursuer1.N   =  100.0; % north pos, m
-pursuer1.E   =  0; % east pos, m
-pursuer1.psi =  pi/2; % heading, rad
-pursuer1.V   =  1.0   ; % velocity magnitude, m/s
+% Pursuer-1 init params
+pursuer1.N   =  0.0; % north pos, m
+pursuer1.E   =  100; % east pos, m
+pursuer1.psi =  pi/6; % heading, rad
+pursuer1.V   =  1.0; % velocity magnitude, m/s
 pursuer1.Nv  =  pursuer1.V * cos(pursuer1.psi); % north velocity, m/s
 pursuer1.Ev  =  pursuer1.V * sin(pursuer1.psi); % east velocity, m/s
 
-% Pursuer-2 init prams
+% Pursuer-2 init params
 pursuer2.N   =  0; % north pos, m
-pursuer2.E   =  100.0; % east pos, m
-pursuer2.psi =  0; % heading, rad
-pursuer2.V   =  1.0; % velocity magnitude, m/s
+pursuer2.E   =  300.0; % east pos, m
+pursuer2.psi =  -pi/3; % heading, rad
+pursuer2.V   =  pursuer1.V * cos(pursuer1.psi)/cos(pursuer2.psi); % velocity magnitude, m/s
 pursuer2.Nv  =  pursuer2.V * cos(pursuer2.psi); % north velocity, m/s
 pursuer2.Ev  =  pursuer2.V * sin(pursuer2.psi); % east velocity, m/s
 
-% Defender init prams
-defender.N   =  20050; % north pos, m
-defender.E   =  20050; % east pos, m
-defender.psi =  pi/4; % heading, rad
-defender.V   =  200; % velocity magnitude, m/s
+% Target init params
+target.anchored = false; % fix target to init pos when true
+target.N   =  200; % north pos, m
+target.E   =  200;   % east pos, m
+target.Nv  =  0.7; % north velocity, m/s
+target.Ev  =  -pursuer1.Ev; % east velocity, m/s
+target.psi =  atan2(target.Ev,target.Nv);
+target.V   = sqrt(target.Nv^2 + target.Ev^2); % velocity magnitude, m/s
+
+% Defender init params
+defender.N   =  200; % north pos, m
+defender.E   =  200; % east pos, m
+defender.psi = atan2(target.Ev,target.Nv); % heading, rad
+defender.V   =  0.9; % velocity magnitude, m/s
 defender.Nv  =  defender.V * cos(defender.psi); % north velocity, m/s
 defender.Ev  =  defender.V * sin(defender.psi); % east velocity, m/s
 
-% Observations:
-% changing the velocity severely affects the operation
-% if the present configuration is achieved, the guidance law
-% will guarantee a collision between the two missiles
-% for angle 45, we need velocities close to or larger than the target     
-% for angle 225 we need velocities slower than 0.8
-
-% Target init prams
-target.anchored = false; % fix target to init pos when true
-target.N   =  250; % north pos, m
-target.E   =  250;   % east pos, m
-target.Nv  =  0.4; % north velocity, m/s
-target.Ev  =  0.4; % east velocity, m/s
-target.psi = pi/4;
-target.V   = sqrt(target.Nv^2 + target.Ev^2); % velocity magnitude, m/s
 % Current prams
 % Applied as a disturbance to pursuer's and target's velocity
 current.Nv =  0.0; % north velocity, m/s
 current.Ev =  0.0; % east velocity, m/s
 % Sim params
-S  = 50000;    % max sim duration, seconds
+S  = 1200;    % max sim duration, seconds
 dt = 0.4;     % time-step size, seconds
 Niter = S/dt; % max iteration num
 % Pre-allocate logger
@@ -79,6 +81,7 @@ logger.Lambda12 = nan(1, Niter); % mutual/target bearing
 %--------------------------------------------------------------------------
 % Init sim
 %--------------------------------------------------------------------------
+
 RR12_last = [(pursuer2.N - pursuer1.N);... % delta N
     (pursuer2.E - pursuer1.E)];      % delta E
 RTP_last1 = [(target.N - pursuer1.N);... % delta N
@@ -107,10 +110,6 @@ pursuer2.E = pursuer2.E + pursuer2.Ev*dt;
 % Run sim
 %--------------------------------------------------------------------------
 for k = 1:Niter
-    % LOS MIDPOINT VELOCITY
-    los_midpoint.Nv = (pursuer1.Nv + pursuer2.Nv)/2;
-    los_midpoint.Ev = (pursuer1.Ev + pursuer2.Ev)/2;
-
     % Relative position in the inertial frame, m
     RR12 = [(pursuer2.N - pursuer1.N);... % delta N
         (pursuer2.E - pursuer1.E)];      % delta E
@@ -122,6 +121,14 @@ for k = 1:Niter
         (defender.E - pursuer1.E)];      % delta E
     RDP2 = [(defender.N - pursuer2.N);... % delta N
         (defender.E - pursuer2.E)];      % delta E
+    
+    LOS_ANGLE = atan2(RR12(2), RR12(1));
+    target.psi = LOS_ANGLE - pi/2;
+    defender.psi = LOS_ANGLE - pi /2;
+    target.Nv  =  target.V * cos(target.psi); % north velocity, m/s
+    target.Ev  =  target.V * sin(target.psi); % east velocity, m/s
+    defender.Nv  =  defender.V * cos(defender.psi); % north velocity, m/s
+    defender.Ev  =  defender.V * sin(defender.psi); % east velocity, m/s
     
     % Range to target
     R1 = norm(RTP1);
@@ -181,8 +188,8 @@ for k = 1:Niter
     ap2 = N * Vp2 * (lambda_dot2-weight*lambdaD_dot2);
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%% Guidance command for defender %%%%%%%%%%%%%
-    if abs(RDP1) > 0.25 & abs(RDP2) > 0.25
-        adp = N * Vd * (lambdaD_dot1 + lambdaD_dot2)/2;
+    if abs(RDP1) > 0.25 & abs(RDP2) > 0.25 & false
+        adp = N * Vd * (lambdaD_dot1 + lambdaD_dot2);
     else
         adp = 0;
     end
@@ -236,16 +243,10 @@ for k = 1:Niter
     pursuer2.psi = atan2(pursuer2.Ev, pursuer2.Nv);
     
     % Update defender heading
-    %defender.psi = atan2(defender.Ev, defender.Nv);
-    defender.psi = target.psi;
+    defender.psi = atan2(defender.Ev, defender.Nv);
+
     % Update target pos for time step
     if(~target.anchored)
-        target_velocity = 0.4*sqrt(2);
-        target.psi = atan2(los_midpoint.Ev, los_midpoint.Nv);
-        target.Nv = - target_velocity * sin(target.psi);
-        target.Ev = - target_velocity * cos(target.psi);
-        %target.N = target.N + target.Nv*dt + current.Nv*dt;
-        %target.E = target.E + target.Ev*dt + current.Ev*dt;
         target.N = target.N + target.Nv*dt + current.Nv*dt;
         target.E = target.E + target.Ev*dt + current.Ev*dt;
     end

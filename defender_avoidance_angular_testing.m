@@ -2,12 +2,15 @@ clear; close all
 % Pro-Nav gain, unitless (typically set between 3-5)
 N = 4;
 w = 0.3;
+logger.intercepting   = NaN(1, 2000);
+logger.angleindex = NaN(1, 2000) + 0;
 for angleindex = 1:2000
+    logger.angleindex(angleindex) = angleindex;
     firing_angle = angleindex/1000;
     % Pursuer-1 init prams
     pursuer1.N   =  100.0; % north pos, m
     pursuer1.E   =  0; % east pos, m
-    pursuer1.psi =  0; % heading, rad
+    pursuer1.psi =  37/180*pi; % heading, rad
     pursuer1.V   =  1.5; % velocity magnitude, m/s
     pursuer1.Nv  =  pursuer1.V * cos(pursuer1.psi); % north velocity, m/s
     pursuer1.Ev  =  pursuer1.V * sin(pursuer1.psi); % east velocity, m/s
@@ -40,7 +43,7 @@ for angleindex = 1:2000
     current.Nv =  0.0; % north velocity, m/s
     current.Ev =  0.0; % east velocity, m/s
     % Sim params
-    S  = 50000;    % max sim duration, seconds
+    S  = 1200;    % max sim duration, seconds
     dt = 0.4;     % time-step size, seconds
     Niter = S/dt; % max iteration num
     % Pre-allocate logger
@@ -166,18 +169,21 @@ for angleindex = 1:2000
         %-------------------------------------
         
         % Terminate sim at intercept
-        if abs(R1) <= 0.25 || abs(R2) <= 0.25 || abs(R12) <= 0.25 || abs(RD1) <= 0.25
+        if abs(R1) <= 0.25 || abs(RD1) <= 0.25
             if abs(RD1) <= 0.25
                 disp("intercepting at")
                 disp(firing_angle)
+                logger.intercepting(angleindex) = 2;
                 break;
             elseif abs(R1) <=0.25
                 disp(angleindex)
+                logger.intercepting(angleindex) = 1;
             
             end
             break;
-        elseif k >50000/0.4-1
+        elseif k > 29900
                 disp(angleindex)
+                logger.intercepting(angleindex) = 0;
         end
         
         % Update pursuer pos for time-step and apply current slip
@@ -282,10 +288,7 @@ close all;
 % Position
 %-------------------------------------
 figure;
-scatter(logger.pE1, logger.pN1, 'filled'); hold on;
-scatter(logger.pE2, logger.pN2, 'filled'); hold on;
-scatter(logger.dE1, logger.dN1, 'filled'); hold on;
-scatter(logger.tE, logger.tN, 'filled');
+scatter(logger.angleindex, logger.intercepting, 'filled'); hold on;
 set(gca, 'DataAspectRatio',[10 10 10]);
 title(['Pure Proportional Navigation, N = ' num2str(N) ])
 legend('Pursuer1', 'Pursuer2', 'Defender', 'Target', 'Location', 'southoutside',...

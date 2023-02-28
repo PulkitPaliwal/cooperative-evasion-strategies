@@ -1,28 +1,36 @@
+%% copy the symmetric case
+%% obtain all the components along and perpendicular to LOS
+%% hardcode the intial conditions
+%% setting initial condition as follows:
+%  target is on perpendicular bisector
+%  pursuers velocity rays intersecting somewhere in the region
+%  give initial horizontal velocity (LOS Frame) to target
+% for convenient initial coding, setting initial pursuer positions on the "east-axis"
 clear; close all
 % Pro-Nav gain, unitless (typically set between 3-5)
 N = 4;
-weight = 0.33;
-% Pursuer-1 init prams
-pursuer1.N   =  100.0; % north pos, m
-pursuer1.E   =  0; % east pos, m
-pursuer1.psi =  pi/2; % heading, rad
+weight = 0.55;
+% Pursuer-1 init params
+pursuer1.N   =  0.0; % north pos, m
+pursuer1.E   =  100; % east pos, m
+pursuer1.psi =  pi/3; % heading, rad
 pursuer1.V   =  1.0; % velocity magnitude, m/s
 pursuer1.Nv  =  pursuer1.V * cos(pursuer1.psi); % north velocity, m/s
 pursuer1.Ev  =  pursuer1.V * sin(pursuer1.psi); % east velocity, m/s
 
-% Pursuer-2 init prams
+% Pursuer-2 init params
 pursuer2.N   =  0; % north pos, m
-pursuer2.E   =  100.0; % east pos, m
-pursuer2.psi =  0; % heading, rad
+pursuer2.E   =  300.0; % east pos, m
+pursuer2.psi =  -pi/3; % heading, rad
 pursuer2.V   =  1.0; % velocity magnitude, m/s
 pursuer2.Nv  =  pursuer2.V * cos(pursuer2.psi); % north velocity, m/s
 pursuer2.Ev  =  pursuer2.V * sin(pursuer2.psi); % east velocity, m/s
 
-% Defender init prams
-defender.N   =  250; % north pos, m
-defender.E   =  250; % east pos, m
-defender.psi =  pi/4; % heading, rad
-defender.V   =  1.0; % velocity magnitude, m/s
+% Defender init params
+defender.N   =  200; % north pos, m
+defender.E   =  200; % east pos, m
+defender.psi =  0; % heading, rad
+defender.V   =  1.2; % velocity magnitude, m/s
 defender.Nv  =  defender.V * cos(defender.psi); % north velocity, m/s
 defender.Ev  =  defender.V * sin(defender.psi); % east velocity, m/s
 
@@ -33,12 +41,13 @@ defender.Ev  =  defender.V * sin(defender.psi); % east velocity, m/s
 % for angle 45, we need velocities close to or larger than the target     
 % for angle 225 we need velocities slower than 0.8
 
-% Target init prams
+% Target init params
 target.anchored = false; % fix target to init pos when true
-target.N   =  250; % north pos, m
-target.E   =  250;   % east pos, m
-target.Nv  =  0.6; % north velocity, m/s
-target.Ev  =  0.6; % east velocity, m/s
+target.N   =  200; % north pos, m
+target.E   =  200;   % east pos, m
+target.psi =  0;
+target.Nv  =  0.7; % north velocity, m/s
+target.Ev  =  0; % east velocity, m/s
 target.V   = sqrt(target.Nv^2 + target.Ev^2); % velocity magnitude, m/s
 % Current prams
 % Applied as a disturbance to pursuer's and target's velocity
@@ -78,6 +87,10 @@ logger.Lambda12 = nan(1, Niter); % mutual/target bearing
 %--------------------------------------------------------------------------
 % Init sim
 %--------------------------------------------------------------------------
+
+LOS_ANGLE = 0;
+
+
 RR12_last = [(pursuer2.N - pursuer1.N);... % delta N
     (pursuer2.E - pursuer1.E)];      % delta E
 RTP_last1 = [(target.N - pursuer1.N);... % delta N

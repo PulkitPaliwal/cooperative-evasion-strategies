@@ -5,9 +5,9 @@ w = 0.3;
 
 % Pursuer-1 init prams
 pursuer1.N   =  100.0; % north pos, m
-pursuer1.E   =  0; % east pos, m
-pursuer1.psi =  0; % heading, rad
-pursuer1.V   =  1.5; % velocity magnitude, m/s
+pursuer1.E   =  0.0; % east pos, m
+pursuer1.psi =  pi/4; % heading, rad
+pursuer1.V   =  1.2; % velocity magnitude, m/s
 pursuer1.Nv  =  pursuer1.V * cos(pursuer1.psi); % north velocity, m/s
 pursuer1.Ev  =  pursuer1.V * sin(pursuer1.psi); % east velocity, m/s
 
@@ -16,14 +16,14 @@ pursuer2.N   =  0; % north pos, m
 pursuer2.E   =  100; % east pos, m
 pursuer2.psi =  0; % heading, rad
 pursuer2.V   =  0.0; % velocity magnitude, m/s
-pursuer2.Nv  =  pursuer2.V * cos(pursuer2.psi); % north velocity, m/s
+pursuer2.Nv  =  pursuer2.V * cos(pursuer2.psi); % north otvelocity, m/s
 pursuer2.Ev  =  pursuer2.V * sin(pursuer2.psi); % east velocity, m/s
 
 % Defender init prams
 defender.N   =  250.0; % north pos, m
 defender.E   =  250.0; % east pos, m
-defender.psi =  pi; % heading, rad
-defender.V   =  1; % velocity magnitude, m/s
+defender.psi =  pi/4; % heading, rad
+defender.V   =  1.0; % velocity magnitude, m/s
 defender.Nv  =  defender.V * cos(defender.psi); % north velocity, m/s
 defender.Ev  =  defender.V * sin(defender.psi); % east velocity, m/s
 
