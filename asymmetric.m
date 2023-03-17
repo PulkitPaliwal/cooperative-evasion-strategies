@@ -8,14 +8,14 @@
 % for convenient initial coding, setting initial pursuer positions on the "east-axis"
 clear; close all
 % Pro-Nav gain, unitless (typically set between 3-5)
-err_ang = 0.4;
+err_ang = 1.2;
 N = 4;
 weight = 0.7;
 % Pursuer-1 init params
 pursuer1.N   =  0.0; % north pos, m
 pursuer1.E   =  0.0; % east pos, m
 pursuer1.psi =  pi/6; % heading, rad
-pursuer1.V   =  0.6; % velocity magnitude, m/s
+pursuer1.V   =  0.7; % velocity magnitude, m/s
 pursuer1.Nv  =  pursuer1.V * cos(pursuer1.psi); % north velocity, m/s
 pursuer1.Ev  =  pursuer1.V * sin(pursuer1.psi); % east velocity, m/s
 
@@ -33,19 +33,18 @@ pursuer2.Ev  =  pursuer2.V * sin(pursuer2.psi); % east velocity, m/s
 target.anchored = false; % fix target to init pos when true
 target.N   =  300; % north pos, m
 target.E   =  200;   % east pos, m
-target.Nv  =  0.5; % north velocity, m/s
-target.Ev  =  pursuer2.Ev-pursuer1.Ev; % east velocity, m/s
+target.Nv  =  1.0; % north velocity, m/s
+target.Ev  =  pursuer2.Ev + pursuer1.Ev; % east velocity, m/s
 %target.Nv = 0.4;
 %target.Ev = 0.0;
-target.psi =  atan2(target.Ev,target.Nv);
+target.psi =  atan2(target.Nv, target.Ev);
 target.V   = sqrt(target.Nv^2 + target.Ev^2); % velocity magnitude, m/s
- 
+
 % Defender init params
 defender.N   =  300; % north pos, m
 defender.E   =  200; % east pos, m
-defender.psi = atan2(target.Ev,target.Nv); % heading, rad
+defender.psi =  target.psi; % heading, rad
 defender.V   =  target.V; % velocity magnitude, m/s
-defender.V =    target.V;
 defender.Nv  =  defender.V * cos(defender.psi); % north velocity, m/s
 defender.Ev  =  defender.V * sin(defender.psi); % east velocity, m/s
 
@@ -54,8 +53,8 @@ defender.Ev  =  defender.V * sin(defender.psi); % east velocity, m/s
 current.Nv =  0.0; % north velocity, m/s
 current.Ev =  0.0; % east velocity, m/s
 % Sim params
-S  = 12000;    % max sim duration, seconds
-dt = 0.1;     % time-step size, seconds
+S  = 50000;    % max sim duration, seconds
+dt = 0.4;     % time-step size, seconds
 Niter = S/dt; % max iteration num
 % Pre-allocate logger
 logger.t   = nan(1, Niter);     % elapsed time
@@ -127,7 +126,6 @@ pursuer2.E = pursuer2.E + pursuer2.Ev*dt;
 % Run sim
 %--------------------------------------------------------------------------
 for k = 1:Niter
-
     % Relative position in the inertial frame, m
     RR12 = [(pursuer2.N - pursuer1.N);... % delta N
         (pursuer2.E - pursuer1.E)];      % delta E
@@ -139,53 +137,20 @@ for k = 1:Niter
         (defender.E - pursuer1.E)];      % delta E
     RDP2 = [(defender.N - pursuer2.N);... % delta N
         (defender.E - pursuer2.E)];      % delta E
-
-    LOS_ANGLE = atan2(RR12(1), RR12(2));
-    along_los = pursuer1.V * cos(pursuer1.psi - LOS_ANGLE) + pursuer2.V * cos(pursuer2.psi - LOS_ANGLE);
-    target_v_wrt_los.prll = along_los;
-    defender_v_wrt_los.prll = along_los;
-    if (target.V)^2 - (along_los)^2 > 0
-        if target.Nv > 0
-            target_v_wrt_los.perp = sqrt((target.V)^2 - (along_los)^2);
-        else
-            target_v_wrt_los.perp = -sqrt((target.V)^2 - (along_los)^2);
-        end
-    else
-        target_v_wrt_los.perp = 0;
-        target_v_wrt_los.prll = min(target.V, abs(target_v_wrt_los.prll));
-    end
-    if (defender.V)^2 - (along_los)^2 > 0
-        if defender.Nv > 0
-            defender_v_wrt_los.perp = sqrt((defender.V)^2 - (along_los)^2);
-        else
-            defender_v_wrt_los.perp = -sqrt((defender.V)^2 - (along_los)^2);
-        end
-    else
-        defender_v_wrt_los.perp = 0;
-        defender_v_wrt_los.prll = min(defender.V, abs(defender_v_wrt_los.prll));
-    end
-    %disp(along_los)
-    if along_los > 0 || along_los < 0
-        target_angle_wrt_los = atan2(target_v_wrt_los.perp, target_v_wrt_los.prll);
-        defender_angle_wrt_los = atan2(defender_v_wrt_los.perp, defender_v_wrt_los.prll);
-    else
-        if target_v_wrt_los.perp > 0
-            target_angle_wrt_los = pi/2;
-        else
-            target_angle_wrt_los = -pi/2;
-        end
-    end
-    target.psi = pi + LOS_ANGLE + target_angle_wrt_los;
-    defender.psi = pi + LOS_ANGLE + defender_angle_wrt_los;
-    target.Nv  =  target.V * cos(target.psi); % north velocity, m/s
-    target.Ev  =  target.V * sin(target.psi); % east velocity, m/s
-    defender.Nv  =  defender.V * cos(defender.psi); % north velocity, m/s
-    defender.Ev  =  defender.V * sin(defender.psi); % east velocity, m/s
-    % Update defender heading
-    defender.psi = atan2(defender.Ev, defender.Nv);
-
+    % Target pos
+    target.N = target.N + target.Nv*dt;
+    target.E = target.E + target.Ev*dt;
     
+    % Defender pos
+    defender.N = defender.N + defender.Nv*dt;
+    defender.E = defender.E + defender.Ev*dt;
     
+    % Pursuer pos
+    pursuer1.N = pursuer1.N + pursuer1.Nv*dt;
+    pursuer1.E = pursuer1.E + pursuer1.Ev*dt;
+    pursuer2.N = pursuer2.N + pursuer2.Nv*dt;
+    pursuer2.E = pursuer2.E + pursuer2.Ev*dt;
+
     % Range to target
     R1 = norm(RTP1);
     R2 = norm(RTP2);
@@ -217,6 +182,7 @@ for k = 1:Niter
     % Vt = sqrt(target.Nv^2 + target.Ev^2);
     
     % Line-of-sight (LOS) angle, rad
+    disp(RTP1)
     lambda1 = atan2(RTP1(2), RTP1(1));  % target and pursuer1
     lambda2 = atan2(RTP2(2), RTP2(1));  % target and pursuer2
     lambdaD1 = atan2(RDP1(2), RDP1(1)); % defender and pursuer1
@@ -264,22 +230,18 @@ for k = 1:Niter
         break;
     end
     
-    if abs(LOS_ANGLE - atan2(((pursuer2.N + pursuer1.N)/2 - target.N), ((pursuer2.E + pursuer1.E)/2 - target.E)) - pi/2) > err_ang && abs(LOS_ANGLE - atan2(((pursuer2.N + pursuer1.N)/2 - target.N), ((pursuer2.E + pursuer1.E)/2 - target.E)) + pi/2) > err_ang
+    % Terminate sim when not perpendicular
+    if abs(abs(LOS_ANGLE) - abs(atan2(((pursuer2.N + pursuer1.N)/2 - target.N), ((pursuer2.E + pursuer1.E)/2 - target.E))) - pi/2) > err_ang && abs(abs(LOS_ANGLE) - abs(atan2(((pursuer2.N + pursuer1.N)/2 - target.N), ((pursuer2.E + pursuer1.E)/2 - target.E))) + pi/2) > err_ang
         disp("FAILURE")
+        disp(k)
         disp(LOS_ANGLE - atan2(((pursuer2.N + pursuer1.N)/2 - target.N), ((pursuer2.E + pursuer1.E)/2 - target.E)))
         break
+    else
+        disp("GOOD")
+        disp(LOS_ANGLE - atan2(((pursuer2.N + pursuer1.N)/2 - target.N), ((pursuer2.E + pursuer1.E)/2 - target.E)))
     end
 
-    % Update pursuer pos for time-step and apply current slip
-    pursuer1.N = pursuer1.N + pursuer1.Nv*dt + current.Nv*dt;
-    pursuer1.E = pursuer1.E + pursuer1.Ev*dt + current.Ev*dt;
-    pursuer2.N = pursuer2.N + pursuer2.Nv*dt + current.Nv*dt;
-    pursuer2.E = pursuer2.E + pursuer2.Ev*dt + current.Ev*dt;
-    % Update defender pos for time-step and apply current slip
-    defender.N = defender.N + defender.Nv*dt + current.Nv*dt;
-    defender.E = defender.E + defender.Ev*dt + current.Ev*dt;
-    % Compute the N/E acceleration commands
-    % In pure pro-nav accel commands are applied normal
+   
     % to pursuer's velocity vector
     pNa1 = -ap1 * sin(pursuer1.psi);
     pEa1 =  ap1 * cos(pursuer1.psi);
@@ -296,26 +258,40 @@ for k = 1:Niter
     pursuer2.Nv = pursuer2.Nv + pNa2*dt;
     pursuer2.Ev = pursuer2.Ev + pEa2*dt;
 
-     % Update defender N/E velocities
-    defender.Nv = defender.Nv + dNa*dt;
-    defender.Ev = defender.Ev + dEa*dt;
+    
     
     % Update pursuer heading
     pursuer1.psi = atan2(pursuer1.Ev, pursuer1.Nv);
     pursuer2.psi = atan2(pursuer2.Ev, pursuer2.Nv);
-    
-    
 
     % Update target pos for time step
-    if(~target.anchored)
-        target.N = target.N + target.Nv*dt + current.Nv*dt;
-        target.E = target.E + target.Ev*dt + current.Ev*dt;
-    end
+   
     RTP_last1 = RTP1;
     RTP_last2 = RTP2;
     RDP_last1 = RDP1;
     RDP_last2 = RDP2;
     RR12_last = RR12;
+
+    %-------------------------------------
+    %% update defender and target velocities
+    LOS_ANGLE = atan2(pursuer2.N - pursuer1.N, pursuer2.E - pursuer1.E);
+    %% move target and defender in perpendicular direction
+    v_along_LOS = pursuer1.V *sin(LOS_ANGLE - pursuer1.psi) + pursuer2.V*sin(LOS_ANGLE - pursuer2.psi);
+    if abs(target.V) > abs(v_along_LOS)
+        v_perpendicular_LOS = sqrt(target.V^2 - v_along_LOS^2);
+    else
+        v_perpendicular_LOS  = 0;
+    end
+
+    deviation = atan(v_perpendicular_LOS/v_along_LOS);
+    target.psi = LOS_ANGLE + deviation;
+    defender.psi = target.psi;
+    target.Nv = target.V*sin(target.psi);
+    target.Ev = -target.V*cos(target.psi);
+    defender.Nv = defender.V*sin(defender.psi);
+    defender.Ev = -defender.V*cos(defender.psi);
+    
+    %-------------------------------------
     %-------------------------------------
     % Log time-step data
     logger.t(k)   = k*dt;
@@ -342,45 +318,16 @@ for k = 1:Niter
     logger.R2(k)   = R2;
     logger.Lambda1(k) = lambda1;
     logger.Lambda2(k) = lambda2;
-    %disp(R12)
+    
 end
 %--------------------------------------------------------------------------
 % Visualize results
 %--------------------------------------------------------------------------
 close all;
-% % Impact index
-% [M,I] = min(logger.R1);
-% % Range
-% %-------------------------------------
-% figure;
-% plot(logger.t,logger.R1); hold on;
-% plot(logger.t,logger.R2); hold on;
-% scatter(I*dt, M, 'filled')
-% title(['Pure Proportional Navigation, N = ' num2str(N) ])
-% legend('Range',...
-%     ['Intercept: r = ' num2str(M) ' m, t = ' num2str(I*dt) ' s'],...
-%     'Location','nw')
-% ylabel('Range (m)')
-% xlabel('Elapsed time (sec)')
-% set(gca, 'YDir', 'reverse')
-% % Heading
-% %-------------------------------------
-% rad2deg = @(x) x*180/pi;  % helper function
-% figure;
-% plot(logger.t, rad2deg(logger.psi1)); hold on;
-% plot(logger.t, rad2deg(logger.Lambda1)); hold on;
-% plot(logger.t, rad2deg(logger.psi2)); hold on;
-% plot(logger.t, rad2deg(logger.Lambda2)); hold on;
-% title(['Pure Proportional Navigation, N = ' num2str(N) ])
-% legend('Pursuer1 heading', 'Pursuer2 heading', 'Bearing to target', 'Location', 'nw' )
-% ylabel('Heading angle (deg)')
-% xlabel('Elapsed time (sec)')
-% Position
-%-------------------------------------
 figure;
 scatter(logger.pE1, logger.pN1, 'filled'); hold on;
 scatter(logger.pE2, logger.pN2, 'filled'); hold on;
-scatter(logger.dE1, logger.dN1, 'filled'); hold on;
+scatter(logger.dE1, logger.dN1, 'filled');
 scatter(logger.tE, logger.tN, 'filled');
 set(gca, 'DataAspectRatio',[100 100 100]);
 title(['Pure Proportional Navigation, N = ' num2str(N) ])
